@@ -1,4 +1,3 @@
-
 """Графический интерфейс симуляции сопротивления среды"""
 
 import tkinter as tk
@@ -6,6 +5,7 @@ from tkinter import messagebox, ttk
 
 from src.models.animation_model import Particle
 
+from src.renderers.renderer import ParticleRenderer
 
 class ResistanceApp:
     """Главное окно симуляции"""
@@ -26,6 +26,7 @@ class ResistanceApp:
         self.scale = 1000.0
 
         self._create_widgets()
+        self.renderer = ParticleRenderer(self.canvas)
         self.root.protocol('WM_DELETE_WINDOW', self._close)
 
     def _create_widgets(self):
@@ -141,36 +142,22 @@ class ResistanceApp:
             fluid_velocity=self.fluid_velocity,
         )
 
-        self.canvas.delete('all')
+        self.renderer.clear()
 
         center_x = self.canvas.winfo_width() / 2
-        top_y = 30
         bottom_y = self.canvas.winfo_height() - 30
 
-        display_radius = max(
-            4,
-            min(25, self.particle.radius * self.scale),
-        )
-        y = top_y + self.particle.position * self.scale
+        y = 30 + self.particle.position * self.scale
 
-        if y + display_radius >= bottom_y:
-            y = bottom_y - display_radius
+        if y >= bottom_y:
+            y = bottom_y
             self.running = False
 
-        self.canvas.create_line(
-            0,
-            bottom_y,
-            self.canvas.winfo_width(),
-            bottom_y,
-            fill='#aaaaaa',
-        )
-        self.canvas.create_oval(
-            center_x - display_radius,
-            y - display_radius,
-            center_x + display_radius,
-            y + display_radius,
-            fill='#4a90e2',
-            outline='#245580',
+        self.renderer.draw_ground()
+        self.renderer.draw_particle(
+            x=center_x,
+            y=y,
+            radius=self.particle.radius,
         )
 
         self.status_var.set(
@@ -192,7 +179,7 @@ class ResistanceApp:
             self.root.after_cancel(self.after_id)
             self.after_id = None
 
-        self.canvas.delete('all')
+        self.renderer.clear()
         self.particle = None
         self.status_var.set('Задай параметры и нажми «Запустить»')
 
