@@ -6,6 +6,7 @@ from tkinter import messagebox, ttk
 from src.models.animation_model import Particle
 
 from src.renderers.renderer import ParticleRenderer
+from src.widgets.controls import SimulationControls
 
 class ResistanceApp:
     """Главное окно симуляции"""
@@ -26,11 +27,23 @@ class ResistanceApp:
         self.scale = 1000.0
 
         self._create_widgets()
+
+        self.controls = SimulationControls(
+            self.root,
+            on_start=self.start,
+            on_reset=self.reset,
+            )
+
+        self.radius_var = self.controls.radius_var
+        self.mass_var = self.controls.mass_var
+        self.velocity_var = self.controls.velocity_var
+        self.viscosity_var = self.controls.viscosity_var
+        self.status_var = self.controls.status_var
         self.renderer = ParticleRenderer(self.canvas)
         self.root.protocol('WM_DELETE_WINDOW', self._close)
 
     def _create_widgets(self):
-        """Создать холст и панель управления"""
+        """Создать холст для анимации"""
         self.canvas = tk.Canvas(
             self.root,
             background='white',
@@ -45,66 +58,16 @@ class ResistanceApp:
             pady=10,
         )
 
-        controls = ttk.Frame(self.root, padding=10)
-        controls.pack(side=tk.RIGHT, fill=tk.Y)
-
-        ttk.Label(
-            controls,
-            text='Силы сопротивления',
-            font=('Arial', 14, 'bold'),
-        ).pack(pady=(0, 12))
-
-        self.radius_var = tk.DoubleVar(value=0.001)
-        self.mass_var = tk.DoubleVar(value=0.01)
-        self.velocity_var = tk.DoubleVar(value=0.0)
-        self.viscosity_var = tk.DoubleVar(value=0.001)
-
-        self._add_field(controls, 'Радиус частицы (м)', self.radius_var)
-        self._add_field(controls, 'Масса частицы (кг)', self.mass_var)
-        self._add_field(
-            controls,
-            'Начальная скорость (м/с)',
-            self.velocity_var,
-        )
-        self._add_field(
-            controls,
-            'Вязкость среды (Па·с)',
-            self.viscosity_var,
-        )
-
-        ttk.Button(
-            controls,
-            text='Запустить',
-            command=self.start,
-        ).pack(fill=tk.X, pady=(12, 4))
-
-        ttk.Button(
-            controls,
-            text='Сбросить',
-            command=self.reset,
-        ).pack(fill=tk.X, pady=4)
-
-        self.status_var = tk.StringVar(
-            value='Задай параметры и нажми «Запустить»'
-        )
-        ttk.Label(
-            controls,
-            textvariable=self.status_var,
-            wraplength=210,
-        ).pack(pady=10)
-
-    @staticmethod
-    def _add_field(parent, label, variable):
-        """Добавить поле ввода параметра"""
-        ttk.Label(parent, text=label).pack(anchor='w')
-        ttk.Entry(parent, textvariable=variable).pack(
-            fill=tk.X,
-            pady=(0, 8),
-        )
-
     def start(self):
         """Создать частицу и запустить анимацию"""
-        self.reset()
+        self.running = False
+
+        if self.after_id is not None:
+            self.root.after_cancel(self.after_id)
+            self.after_id = None
+
+        self.particle = None
+        self.renderer.clear()
 
         try:
             radius = self.radius_var.get()
@@ -112,10 +75,24 @@ class ResistanceApp:
             velocity = self.velocity_var.get()
             viscosity = self.viscosity_var.get()
 
-            if radius <= 0 or mass <= 0 or viscosity < 0:
+            if not 0 < radius <= 0.01:
                 raise ValueError(
-                    'Радиус и масса должны быть положительными, '
-                    'вязкость — неотрицательной.'
+                    'Радиус должен быть больше 0 и не превышать 0.01 м.'
+                )
+
+            if not 0 < mass <= 1:
+                raise ValueError(
+                    'Масса должна быть больше 0 и не превышать 1 кг.'
+                )
+
+            if not 0 <= viscosity <= 10:
+                raise ValueError(
+                    'Вязкость должна быть от 0 до 10 Па·с.'
+                )
+
+            if abs(velocity) > 100:
+                raise ValueError(
+                    'Начальная скорость должна быть от -100 до 100 м/с.'
                 )
 
             self.particle = Particle(
@@ -131,10 +108,14 @@ class ResistanceApp:
         self.running = True
         self._animate()
 
+    
     def _animate(self):
-        """Выполнить один шаг физики и нарисовать частицу"""
+        """Выполнить шаг физики и нарисовать частицу"""
         if not self.running or self.particle is None:
             return
+
+        bottom_y = self.canvas.winfo_height() - 30
+        center_x = self.canvas.winfo_width() / 2
 
         self.particle.update(
             dt=self.dt,
@@ -142,17 +123,13 @@ class ResistanceApp:
             fluid_velocity=self.fluid_velocity,
         )
 
-        self.renderer.clear()
-
-        center_x = self.canvas.winfo_width() / 2
-        bottom_y = self.canvas.winfo_height() - 30
-
         y = 30 + self.particle.position * self.scale
 
         if y >= bottom_y:
             y = bottom_y
             self.running = False
 
+        self.renderer.clear()
         self.renderer.draw_ground()
         self.renderer.draw_particle(
             x=center_x,
@@ -161,18 +138,18 @@ class ResistanceApp:
         )
 
         self.status_var.set(
-            f'Время: {self.dt} с за шаг\n'
-            f'Положение: {self.particle.position} м\n'
-            f'Скорость: {self.particle.velocity} м/с\n'
+            f'Шаг времени: {self.dt:.3f} с\n'
+            f'Положение: {self.particle.position:.4f} м\n'
+            f'Скорость: {self.particle.velocity:.4f} м/с\n'
             f'Сила сопротивления: '
-            f'{self.particle.drag_force(self.viscosity)} Н'
+            f'{self.particle.drag_force(self.viscosity):.6f} Н'
         )
 
         if self.running:
             self.after_id = self.root.after(10, self._animate)
 
     def reset(self):
-        """Остановить анимацию и очистить холст"""
+        """Остановить анимацию и вернуть исходные параметры"""
         self.running = False
 
         if self.after_id is not None:
@@ -181,6 +158,12 @@ class ResistanceApp:
 
         self.renderer.clear()
         self.particle = None
+
+        self.radius_var.set(0.001)
+        self.mass_var.set(0.01)
+        self.velocity_var.set(0.0)
+        self.viscosity_var.set(0.001)
+
         self.status_var.set('Задай параметры и нажми «Запустить»')
 
     def _close(self):
