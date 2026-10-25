@@ -1,59 +1,56 @@
-
-"""Виджеты управления симуляцией"""
+"""Панель управления симуляцией"""
 
 import tkinter as tk
-from tkinter import ttk
 
 
 class SimulationControls:
-    """Панель ввода параметров и управления симуляцией"""
+    """Нижняя панель с кнопками управления анимацией"""
 
-    def __init__(self, parent, on_start, on_reset):
-        """Создать панель и подключить обработчики кнопок"""
-        self.frame = ttk.Frame(parent, padding=10)
-        self.frame.pack(side=tk.RIGHT, fill=tk.Y)
+    def __init__(self, root, on_start, on_reset):
+        self.root = root
+        self.on_start = on_start
+        self.on_reset = on_reset
 
-        ttk.Label(
+        self.frame = tk.Frame(root, background='#1a1a1a')
+        self.frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self._create_widgets()
+
+    def _create_widgets(self):
+        button_style = {
+            'background': '#2a2a2a',
+            'foreground': '#ffffff',
+            'activebackground': '#3a3a3a',
+            'activeforeground': '#ffffff',
+            'relief': tk.FLAT,
+            'borderwidth': 0,
+            'padx': 16,
+            'pady': 6,
+            'font': ('Segoe UI', 10),
+            'cursor': 'hand2',
+        }
+
+        self.start_button = tk.Button(
             self.frame,
-            text='Силы сопротивления',
-            font=('Arial', 14, 'bold'),
-        ).pack(pady=(0, 12))
-
-        self.radius_var = tk.DoubleVar(value=0.001)
-        self.mass_var = tk.DoubleVar(value=0.01)
-        self.velocity_var = tk.DoubleVar(value=0.0)
-        self.viscosity_var = tk.DoubleVar(value=0.001)
-
-        self._add_field('Радиус частицы (м)', self.radius_var)
-        self._add_field('Масса частицы (кг)', self.mass_var)
-        self._add_field('Начальная скорость (м/с)', self.velocity_var)
-        self._add_field('Вязкость среды (Па·с)', self.viscosity_var)
-
-        ttk.Button(
-            self.frame,
-            text='Запустить',
-            command=on_start,
-        ).pack(fill=tk.X, pady=(12, 4))
-
-        ttk.Button(
-            self.frame,
-            text='Сбросить',
-            command=on_reset,
-        ).pack(fill=tk.X, pady=4)
-
-        self.status_var = tk.StringVar(
-            value='Задай параметры и нажми «Запустить»'
+            text='Старт',
+            command=self.on_start,
+            **button_style,
         )
-        ttk.Label(
-            self.frame,
-            textvariable=self.status_var,
-            wraplength=210,
-        ).pack(pady=10)
+        self.start_button.pack(side=tk.LEFT, padx=8, pady=8)
 
-    def _add_field(self, label, variable):
-        """Добавить подпись и поле ввода"""
-        ttk.Label(self.frame, text=label).pack(anchor='w')
-        ttk.Entry(
+        self.reset_button = tk.Button(
             self.frame,
-            textvariable=variable,
-        ).pack(fill=tk.X, pady=(0, 8))
+            text='Сброс (R)',
+            command=self.on_reset,
+            **button_style,
+        )
+        self.reset_button.pack(side=tk.LEFT, padx=8, pady=8)
+
+        self.hint_label = tk.Label(
+            self.frame,
+            text='R — перезапуск      Esc — выход',
+            background='#1a1a1a',
+            foreground='#888888',
+            font=('Segoe UI', 9),
+        )
+        self.hint_label.pack(side=tk.RIGHT, padx=12)

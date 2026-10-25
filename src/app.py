@@ -1,172 +1,174 @@
-"""Графический интерфейс симуляции сопротивления среды"""
+"""Главное окно симуляции сил сопротивления"""
 
 import tkinter as tk
-from tkinter import messagebox, ttk
 
-from src.models.animation_model import Particle
-
+from src.models.animation_model import create_particles
 from src.renderers.renderer import ParticleRenderer
 from src.widgets.controls import SimulationControls
 
-class ResistanceApp:
-    """Главное окно симуляции"""
 
+class ResistanceApp:
     def __init__(self, root):
-        """Настроить окно и состояние симуляции"""
         self.root = root
         self.root.title('Силы сопротивления (102)')
-        self.root.geometry('1000x650')
-        self.root.minsize(750, 450)
+        self.root.geometry('600x580')
+        self.root.minsize(400, 450)
 
-        self.particle = None
+        self.particles = []
         self.running = False
         self.after_id = None
-        self.viscosity = 0.001
+
+        # Параметры физики
+        self.viscosity = 0.08
         self.fluid_velocity = 0.0
-        self.dt = 0.01
-        self.scale = 1000.0
+
+        self.dt = 0.003
+        self.frame_delay = 20
+
+        self.position_scale = 140.0
+        self.top_margin = 30
 
         self._create_widgets()
+        self.renderer = ParticleRenderer(self.canvas)
 
         self.controls = SimulationControls(
             self.root,
             on_start=self.start,
             on_reset=self.reset,
-            )
+        )
 
-        self.radius_var = self.controls.radius_var
-        self.mass_var = self.controls.mass_var
-        self.velocity_var = self.controls.velocity_var
-        self.viscosity_var = self.controls.viscosity_var
-        self.status_var = self.controls.status_var
-        self.renderer = ParticleRenderer(self.canvas)
+        self.root.bind_all('<KeyPress-r>', self._on_restart)
+        self.root.bind_all('<KeyPress-R>', self._on_restart)
+        self.root.bind_all('<Escape>', self._on_escape)
+
         self.root.protocol('WM_DELETE_WINDOW', self._close)
+        self.root.after(100, self._start_automatically)
 
     def _create_widgets(self):
-        """Создать холст для анимации"""
         self.canvas = tk.Canvas(
             self.root,
-            background='white',
-            highlightthickness=1,
-            highlightbackground='#cccccc',
+            background='#000000',
+            highlightthickness=0,
         )
-        self.canvas.pack(
-            side=tk.LEFT,
-            fill=tk.BOTH,
-            expand=True,
-            padx=10,
-            pady=10,
-        )
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+    def _boundary_y(self):
+        return self.canvas.winfo_height() / 2
+
+    @staticmethod
+    def _screen_radius(particle):
+        return max(3, min(20, particle.radius * 4000))
+
+    def _start_automatically(self):
+        self.renderer.clear()
+        self.renderer.draw_environment(self._boundary_y())
+        self.start()
 
     def start(self):
-        """Создать частицу и запустить анимацию"""
-        self.running = False
+        self._stop_animation()
 
-        if self.after_id is not None:
-            self.root.after_cancel(self.after_id)
-            self.after_id = None
-
-        self.particle = None
-        self.renderer.clear()
-
-        try:
-            radius = self.radius_var.get()
-            mass = self.mass_var.get()
-            velocity = self.velocity_var.get()
-            viscosity = self.viscosity_var.get()
-
-            if not 0 < radius <= 0.01:
-                raise ValueError(
-                    'Радиус должен быть больше 0 и не превышать 0.01 м.'
-                )
-
-            if not 0 < mass <= 1:
-                raise ValueError(
-                    'Масса должна быть больше 0 и не превышать 1 кг.'
-                )
-
-            if not 0 <= viscosity <= 10:
-                raise ValueError(
-                    'Вязкость должна быть от 0 до 10 Па·с.'
-                )
-
-            if abs(velocity) > 100:
-                raise ValueError(
-                    'Начальная скорость должна быть от -100 до 100 м/с.'
-                )
-
-            self.particle = Particle(
-                radius=radius,
-                mass=mass,
-                velocity=velocity,
-            )
-            self.viscosity = viscosity
-        except (ValueError, tk.TclError) as error:
-            messagebox.showerror('Ошибка параметров', str(error))
-            return
+        self.particles = create_particles(
+            initial_velocity=0.3,
+            base_radius=0.003,
+            base_mass=0.02,
+            count=24,
+        )
 
         self.running = True
         self._animate()
 
-    
     def _animate(self):
-        """Выполнить шаг физики и нарисовать частицу"""
-        if not self.running or self.particle is None:
+        self.after_id = None
+
+        if not self.running or not self.particles:
             return
 
-        bottom_y = self.canvas.winfo_height() - 30
-        center_x = self.canvas.winfo_width() / 2
+        width = self.canvas.winfo_width()
+        height = self.canvas.winfo_height()
 
-        self.particle.update(
-            dt=self.dt,
-            viscosity=self.viscosity,
-            fluid_velocity=self.fluid_velocity,
+        if width <= 1 or height <= 1:
+            self.after_id = self.root.after(self.frame_delay, self._animate)
+            return
+
+        boundary_y = self._boundary_y()
+        boundary_position = max(
+            0.0,
+            (boundary_y - self.top_margin) / self.position_scale,
         )
 
-        y = 30 + self.particle.position * self.scale
+        for particle in self.particles:
+            if (
+                not particle.in_resistive_medium
+                and particle.position >= boundary_position
+            ):
+                particle.in_resistive_medium = True
 
-        if y >= bottom_y:
-            y = bottom_y
-            self.running = False
+            particle.update(
+                dt=self.dt,
+                viscosity=self.viscosity,
+                fluid_velocity=self.fluid_velocity,
+            )
+
+            screen_r = self._screen_radius(particle)
+            max_pos = (
+                height - screen_r - 2 - self.top_margin
+            ) / self.position_scale
+
+            if particle.position >= max_pos:
+                particle.position = max_pos
+                if particle.velocity > 0:
+                    particle.velocity = -abs(particle.velocity) * 0.75
 
         self.renderer.clear()
-        self.renderer.draw_ground()
-        self.renderer.draw_particle(
-            x=center_x,
-            y=y,
-            radius=self.particle.radius,
-        )
+        self.renderer.draw_environment(boundary_y)
 
-        self.status_var.set(
-            f'Шаг времени: {self.dt:.3f} с\n'
-            f'Положение: {self.particle.position:.4f} м\n'
-            f'Скорость: {self.particle.velocity:.4f} м/с\n'
-            f'Сила сопротивления: '
-            f'{self.particle.drag_force(self.viscosity):.6f} Н'
-        )
+        spacing = width / (len(self.particles) + 1)
+        for index, particle in enumerate(self.particles):
+            x = spacing * (index + 1)
+            screen_r = self._screen_radius(particle)
 
-        if self.running:
-            self.after_id = self.root.after(10, self._animate)
+            y = self.top_margin + particle.position * self.position_scale
+            y = max(screen_r, min(y, height - screen_r - 2))
 
-    def reset(self):
-        """Остановить анимацию и вернуть исходные параметры"""
+            self.renderer.draw_particle(
+                x=x,
+                y=y,
+                radius=particle.radius,
+            )
+
+        self.after_id = self.root.after(self.frame_delay, self._animate)
+
+    def _stop_animation(self):
         self.running = False
-
         if self.after_id is not None:
-            self.root.after_cancel(self.after_id)
+            try:
+                self.root.after_cancel(self.after_id)
+            except tk.TclError:
+                pass
             self.after_id = None
 
-        self.renderer.clear()
-        self.particle = None
+    def reset(self):
+        self._stop_animation()
+        self.start()
 
-        self.radius_var.set(0.001)
-        self.mass_var.set(0.01)
-        self.velocity_var.set(0.0)
-        self.viscosity_var.set(0.001)
+    def _on_restart(self, event=None):
+        self.reset()
+        return 'break'
 
-        self.status_var.set('Задай параметры и нажми «Запустить»')
+    def _on_escape(self, event=None):
+        self._close()
+        return 'break'
 
     def _close(self):
-        """Закрыть приложение"""
-        self.reset()
+        self._stop_animation()
         self.root.destroy()
+
+
+def main():
+    root = tk.Tk()
+    ResistanceApp(root)
+    root.mainloop()
+
+
+if __name__ == '__main__':
+    main()

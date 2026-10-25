@@ -1,41 +1,43 @@
-"""Отрисовка частиц на холсте Tkinter"""
+"""Отрисовка симуляции на Tkinter Canvas"""
 
 
 class ParticleRenderer:
-    """Отвечает за визуальное представление частицы"""
-
-    def __init__(self, canvas, scale=1000.0):
-        """Сохранить холст и масштаб отображения"""
+    """Класс отрисовки"""
+    def __init__(self, canvas):
         self.canvas = canvas
-        self.scale = scale
 
     def clear(self):
-        """Очистить область рисования"""
         self.canvas.delete('all')
 
-    def draw_particle(self, x, y, radius):
-        """Нарисовать частицу по координатам холста"""
-        display_radius = max(4, min(25, radius * self.scale))
-
-        self.canvas.create_oval(
-            x - display_radius,
-            y - display_radius,
-            x + display_radius,
-            y + display_radius,
-            fill='#4a90e2',
-            outline='#245580',
-        )
-
-    def draw_ground(self):
-        """Нарисовать нижнюю границу области движения"""
+    def draw_environment(self, boundary_y):
         width = self.canvas.winfo_width()
         height = self.canvas.winfo_height()
-        ground_y = height - 30
 
-        self.canvas.create_line(
-            0,
-            ground_y,
-            width,
-            ground_y,
-            fill='#aaaaaa',
+        self.canvas.create_rectangle(
+            0, 0, width, boundary_y,
+            fill='#000000',
+            outline='',
+            tags='environment',
+        )
+
+        self.canvas.create_rectangle(
+            0, boundary_y, width, height,
+            fill='#6e6e6e',
+            outline='',
+            tags='environment',
+        )
+
+    def draw_particle(self, x, y, radius):
+        """Отрисовка частицы"""
+        r = max(3, min(20, radius * 4000))
+
+        self.canvas.create_oval(
+            x - r,
+            y - r,
+            x + r,
+            y + r,
+            fill='',
+            outline='#ffffff',
+            width=2,
+            tags='particle',
         )
