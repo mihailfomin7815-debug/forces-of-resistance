@@ -134,6 +134,42 @@ class TestDragForce:
 
         assert force == 0.0
 
+    def test_zero_resistance_factor_disables_drag(self):
+        p = Particle(
+            radius=0.01,
+            mass=0.05,
+            velocity=2.0,
+            in_resistive_medium=True,
+        )
+
+        force = p.drag_force(
+            viscosity=0.1,
+            resistance_factor=0.0,
+        )
+
+        assert force == 0.0
+
+    def test_double_resistance_factor_doubles_drag(self):
+        p = Particle(
+            radius=0.01,
+            mass=0.05,
+            velocity=2.0,
+            in_resistive_medium=True,
+        )
+
+        normal_force = p.drag_force(
+            viscosity=0.1,
+            resistance_factor=1.0,
+        )
+        double_force = p.drag_force(
+            viscosity=0.1,
+            resistance_factor=2.0,
+        )
+
+        assert double_force == pytest.approx(
+            2.0 * normal_force
+        )
+
 
 class TestUpdate:
     def test_update_without_resistance_matches_free_fall(self):
@@ -184,6 +220,30 @@ class TestUpdate:
         large_loss = 5.0 - large.velocity
 
         assert large_loss < small_loss
+
+    
+    def test_update_with_zero_resistance_matches_free_fall(self):
+        p = Particle(
+            radius=0.01,
+            mass=0.05,
+            velocity=5.0,
+            in_resistive_medium=True,
+        )
+
+        dt = 0.01
+        gravity = 9.81
+
+        p.update(
+            dt=dt,
+            viscosity=0.1,
+            gravity=gravity,
+            resistance_factor=0.0,
+        )
+
+        assert p.velocity == pytest.approx(
+            5.0 + gravity * dt
+        )
+
 
 
 class TestCreateParticles:
@@ -242,3 +302,5 @@ class TestCreateParticles:
         particles = create_particles(count=5)
 
         assert all(isinstance(p, Particle) for p in particles)
+
+    

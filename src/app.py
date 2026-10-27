@@ -18,9 +18,9 @@ class ResistanceApp:
         self.running = False
         self.after_id = None
 
-        # Параметры физики
         self.viscosity = 0.08
         self.fluid_velocity = 0.0
+        self.resistance_factor = 1.0
 
         self.dt = 0.003
         self.frame_delay = 20
@@ -35,6 +35,7 @@ class ResistanceApp:
             self.root,
             on_start=self.start,
             on_reset=self.reset,
+            on_resistance_change=self._set_resistance,
         )
 
         self.root.bind_all('<KeyPress-r>', self._on_restart)
@@ -77,6 +78,10 @@ class ResistanceApp:
         self.running = True
         self._animate()
 
+    def _set_resistance(self, percent):
+        """Устанавливает сопротивление в процентах"""
+        self.resistance_factor = float(percent) / 100.0
+
     def _animate(self):
         self.after_id = None
 
@@ -107,6 +112,7 @@ class ResistanceApp:
                 dt=self.dt,
                 viscosity=self.viscosity,
                 fluid_velocity=self.fluid_velocity,
+                resistance_factor=self.resistance_factor,
             )
 
             screen_r = self._screen_radius(particle)

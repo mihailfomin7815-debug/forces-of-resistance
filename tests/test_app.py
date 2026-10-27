@@ -31,6 +31,9 @@ class TestInitialState:
 
     def test_controls_created(self, app):
         assert isinstance(app.controls, SimulationControls)
+  
+    def test_default_resistance_factor(self, app):
+        assert app.resistance_factor == pytest.approx(1.0)
 
 
 class TestScreenRadius:
@@ -117,3 +120,20 @@ class TestBoundary:
         assert app._boundary_y() == pytest.approx(
             app.canvas.winfo_height() / 2
         )
+
+
+class TestResistanceSetting:
+    def test_set_resistance_from_percent(self, app):
+        app._set_resistance(150)
+
+        assert app.resistance_factor == pytest.approx(1.5)
+
+    def test_zero_percent_disables_resistance(self, app):
+        app._set_resistance(0)
+
+        assert app.resistance_factor == pytest.approx(0.0)
+
+    def test_full_resistance_is_one(self, app):
+        app._set_resistance(100)
+
+        assert app.resistance_factor == pytest.approx(1.0)

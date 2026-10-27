@@ -56,3 +56,41 @@ class TestSimulationControls:
 
         assert 'R' in text
         assert 'Esc' in text
+
+    
+    def test_resistance_scale_exists(self, tk_root):
+        controls = SimulationControls(
+            tk_root,
+            on_start=lambda: None,
+            on_reset=lambda: None,
+        )
+
+        assert isinstance(controls.resistance_scale, tk.Scale)
+        assert float(controls.resistance_scale.get()) == 100.0
+
+    def test_resistance_scale_updates_label(self, tk_root):
+        controls = SimulationControls(
+            tk_root,
+            on_start=lambda: None,
+            on_reset=lambda: None,
+        )
+
+        controls.resistance_scale.set(150)
+
+        assert controls.resistance_label.cget("text") == (
+            "Сопротивление: 150%"
+        )
+
+    def test_resistance_scale_calls_callback(self, tk_root):
+        values = []
+
+        controls = SimulationControls(
+            tk_root,
+            on_start=lambda: None,
+            on_reset=lambda: None,
+            on_resistance_change=values.append,
+        )
+
+        controls.resistance_scale.set(50)
+
+        assert values[-1] == 50

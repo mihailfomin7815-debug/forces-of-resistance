@@ -33,10 +33,14 @@ class Particle:
         viscosity,
         fluid_velocity=0.0,
         fluid_density=1000.0,
+        resistance_factor=1.0,
     ):
         """Сила сопротивления среды ~ r²"""
         if not self.in_resistive_medium:
             return 0.0
+
+        if resistance_factor < 0:
+            raise ValueError('Коэффициент сопротивления не может быть отрицательным')
 
         relative_velocity = self.velocity - fluid_velocity
         speed = abs(relative_velocity)
@@ -62,6 +66,7 @@ class Particle:
 
             magnitude = 0.5 * fluid_density * coefficient * area * (speed ** 2)
 
+        magnitude *= resistance_factor
         return -math.copysign(magnitude, relative_velocity)
 
     def update(
@@ -71,12 +76,14 @@ class Particle:
         fluid_velocity=0.0,
         gravity=9.81,
         fluid_density=1000.0,
+        resistance_factor=1.0,
     ):
         """Обновление с учётом инерции m ~ r³"""
         force_drag = self.drag_force(
             viscosity=viscosity,
             fluid_velocity=fluid_velocity,
             fluid_density=fluid_density,
+            resistance_factor=resistance_factor,
         )
 
         acceleration = gravity + (force_drag / self.mass)
